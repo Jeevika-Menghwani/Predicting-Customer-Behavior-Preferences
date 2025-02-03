@@ -1,0 +1,290 @@
+```{r}
+install.packages("AER")
+library(AER)
+install.packages("ggplot2")
+library(ggplot2)
+install.packages("caret")
+library(caret)
+install.packages("tidyverse")
+```
+
+```{r}
+creditcard <- data("CreditCard")
+str(CreditCard)
+```
+
+
+```{r}
+breaks <- quantile(CreditCard$income, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
+
+# Bin income variable into three groups
+CreditCard$income <- cut(CreditCard$income, breaks = breaks, labels = c("Low", "Medium", "High"))
+
+# Show the results of binning
+table(CreditCard$income)
+```
+
+
+```{r}
+
+
+# Define the number of bins
+num_bins <- 3
+
+# Convert variables to factor with levels "Low", "Medium", and "High"
+CreditCard$age <- factor(cut(CreditCard$age, breaks = num_bins, labels = c("Low", "Medium", "High")))
+CreditCard$reports <- factor(cut(CreditCard$reports, breaks = num_bins, labels = c("Low", "Medium", "High")))
+CreditCard$expenditure <- factor(cut(CreditCard$expenditure, breaks = num_bins, labels = c("Low", "Medium", "High")))
+CreditCard$share <- factor(cut(CreditCard$share, breaks = num_bins, labels = c("Low", "Medium", "High")))
+
+# Convert months into factors
+CreditCard$months <- factor(cut(CreditCard$months, breaks = num_bins, labels = c("Short", "Medium", "Long")))
+
+# Convert majorcards into factors
+CreditCard$majorcards <- factor(cut(CreditCard$majorcards, breaks = num_bins, labels = c("Few", "Some", "Many")))
+
+# Convert active into factors
+CreditCard$active <- factor(cut(CreditCard$active, breaks = num_bins, labels = c("Low", "Medium", "High")))
+
+CreditCard$dependents <- factor(cut(CreditCard$dependents, breaks = num_bins, labels = c("Few", "Some", "Many")))
+
+
+# Set levels to "0", "1", and "2"
+levels(CreditCard$age) <- c("0-29" ,"30-59","60-79")
+levels(CreditCard$expenditure) <- c("0-1999" ,"2000-2999","3000-3999")
+levels(CreditCard$share) <- c("Bottom","Moderate","Elevated")
+levels(CreditCard$months) <- c("1-199","200-399" ,"400-599")
+levels(CreditCard$majorcards) <- c("0","1", "2")
+levels(CreditCard$active) <- c("0-19" ,"20-39","40-59")
+levels(CreditCard$dependents) <- c("0-2","3-5", "6-8")
+levels(CreditCard$reports) <- c("0-9" ,"10-19","20-29")
+
+
+
+
+# Check the distribution of each bin
+table(CreditCard$age)
+table(CreditCard$expenditure)
+table(CreditCard$share)
+table(CreditCard$majorcards)
+table(CreditCard$months)
+table(CreditCard$active)
+table(CreditCard$dependants)
+table(CreditCard$reports)
+# Assuming CreditCards is your dataset
+
+# Define the number of desired bins
+```
+#Equal frequency binning have not been possible due to the uneven distribution of observations across the bins.
+#i used Equal Width Binning approach
+
+```{r}
+set.seed(880)
+train.index <- sample(c(1:nrow(CreditCard)), nrow(CreditCard)*0.6)
+train.df_CreditCard <- CreditCard[train.index, ]
+valid.df_CreditCard <- CreditCard[-train.index, ]
+
+```
+
+```{r}
+
+
+# Assuming train.df is your training dataset
+
+library(ggplot2)
+
+# Assuming train.df is your training dataset
+
+# Create proportional bar plots for each input variable
+ggplot(train.df_CreditCard, aes(x = factor(age), fill = factor(income))) +
+  geom_bar(position = "fill") +
+  labs(x = "Age", y = "Proportion", fill = "Income") +
+  theme_minimal()
+
+ggplot(train.df_CreditCard, aes(x = factor(expenditure), fill = factor(income))) +
+  geom_bar(position = "fill") +
+  labs(x = "Expenditure", y = "Proportion", fill = "Income") +
+  theme_minimal()
+
+ggplot(train.df_CreditCard, aes(x = factor(share), fill = factor(income))) +
+  geom_bar(position = "fill") +
+  labs(x = "Share", y = "Proportion", fill = "Income") +
+  theme_minimal()
+
+ggplot(train.df_CreditCard, aes(x = factor(months), fill = factor(income))) +
+  geom_bar(position = "fill") +
+  labs(x = "months", y = "Proportion", fill = "Income") +
+  theme_minimal()
+
+ggplot(train.df_CreditCard, aes(x = factor(majorcards), fill = factor(income))) +
+  geom_bar(position = "fill") +
+  labs(x = "majorcards", y = "Proportion", fill = "Income") +
+  theme_minimal()
+
+ggplot(train.df_CreditCard, aes(x = factor(active), fill = factor(income))) +
+  geom_bar(position = "fill") +
+  labs(x = "active", y = "Proportion", fill = "Income") +
+  theme_minimal()
+
+ggplot(train.df_CreditCard, aes(x = factor(dependents), fill = factor(income))) +
+  geom_bar(position = "fill") +
+  labs(x = "dependants", y = "Proportion", fill = "Income") +
+  theme_minimal()
+
+ggplot(train.df_CreditCard, aes(x = factor(reports), fill = factor(income))) +
+  geom_bar(position = "fill") +
+  labs(x = "reports", y = "Proportion", fill = "Income") +
+  theme_minimal()
+```
+```{r}
+
+```
+
+# based on bar grapgh i feel majorcards do not have strong amount of predictive power in a naive Bayes mode
+```{r}
+
+library(dplyr)
+library(dplyr)
+
+CreditCard <- subset(CreditCard, select = -majorcards)
+
+
+
+
+
+
+
+```
+
+```{r}
+library(e1071)
+
+# Build Naive Bayes model
+nb_model <- naiveBayes(income ~ ., data = train.df_CreditCard)
+nb_model
+```
+
+
+
+
+```{r}
+# Predictions on training data
+# Load required packages (if not already loaded)
+library(caret)  # For confusionMatrix function
+
+# Predictions on training and validation data
+pred.class<- predict(nb_model,newdata = train.df_CreditCard)
+confusionMatrix(pred.class,train.df_CreditCard$income)
+pred.class<- predict(nb_model,newdata = valid.df_CreditCard)
+confusionMatrix(pred.class,valid.df_CreditCard$income)
+```
+#In comparing the performance of the training set with the validation set, several observations can be made. Firstly, the accuracy of the training set (52.21%) is slightly higher than that of the validation set (49.34%). However, both accuracies are relatively low, indicating that the model's predictive performance is modest. Looking at the confusion matrices, we observe that the distribution of predictions across different classes varies between the training and validation sets. For example, in the training set, the model tends to predict more instances as "High" compared to the validation set. Similarly, the sensitivities, specificities, and positive predictive values for each class differ between the two sets, suggesting variations in the model's ability to correctly identify instances of each class. Overall, while the model performs better on the training set, it still exhibits limitations in its generalization to unseen data, as evidenced by its performance on the validation set.
+
+```{r}
+# Get predicted probabilities for each class
+pred.prob1 <- predict(nb_model, newdata = valid.df_CreditCard, type = "raw")
+
+# Create a data frame containing actual income and predicted probabilities
+top_100_income <- data.frame(actual = valid.df_CreditCard$income, pred.prob1)
+
+# Sort the data frame by the probability of "High" income in descending order
+likely_group <- arrange(top_100_income, desc(High))[1:100, ]
+likely_group
+
+```
+
+```{r}
+table (likely_group$actual)
+```
+
+```{r}
+# Model accuracy
+model_accuracy <- 49.34
+
+# Naive rule accuracy
+naive_rule_accuracy <- 31.12
+
+# Calculate percentage difference
+percentage_difference <- ((model_accuracy - naive_rule_accuracy) / naive_rule_accuracy) * 100
+
+# Print the result
+print(percentage_difference)
+
+```
+#The percentage difference between the model accuracy and the naive rule accuracy is approximately 58.55%. This means that the model accuracy is around 58.55% higher than the accuracy achieved by the naive rule. In other words, the model performs significantly better than simply using the naive rule for classification. This difference indicates the effectiveness of the model in making accurate predictions compared to a simplistic approach like the naive rule.
+#In classification, the naive rule typically refers to a simple and naive approach where all instances are classified into the majority class. This means that regardless of the features or characteristics of each instance, they would all be assigned to the class that is most prevalent in the dataset.
+
+#If the naive rule were applied to the training set, all records would be classified into the majority class. In this case, since the majority class prevalence is not provided, I'll assume it's the most common class observed in the training set. Let's say the majority class is "Low" based on the prevalence in the training set. Therefore, the naive rule would classify all records in the training set as "Low"
+
+```{r}
+table (likely_group$actual)
+
+```
+
+```{r}
+# Counts of actual income groups within the 100 records
+actual_counts <- c(Low = 7, Medium = 23, High = 70)
+
+# Number of records in the high-income group within the 100 records
+actual_high_income <- actual_counts["High"]
+
+# Number of correctly predicted instances in the high-income group by the naive rule
+correct_naive <- actual_counts["Low"]
+
+# Accuracy of the naive rule for high-income group predictions
+accuracy_naive <- correct_naive / actual_high_income * 100
+
+# Overall model's accuracy
+# Assuming 'actual_income' contains the actual income group for each record
+# Assuming 'predictions' contains the model's predictions
+correct_model <- sum(top_100_income == "actual")
+total_records <- sum(actual_counts)
+accuracy_model <- correct_model / total_records * 100
+
+# Print the accuracies
+cat("Accuracy of the naive rule for high-income group predictions:", accuracy_naive, "%\n")
+cat("Overall model's accuracy:", accuracy_model, "%\n")
+
+```
+
+```{r}
+
+new_observation <- data.frame(
+  card="yes",
+  owner="yes",
+  reports="10",
+  age = "40",            # Age of the person
+  expenditure = "3000",   # Expenditure of the person
+  share = "moderate",         # Share of the person
+  active = "4",      # Whether the person is active
+  dependants = "0",      # Number of dependants
+  months =  "54",  
+  selfemp= "yes" 
+)
+
+
+# Predict the income group for the new observation
+pred.class_new <- predict(nb_model, new_observation)
+pred.class_new
+
+
+# Print the predicted income group
+
+```
+
+```{r}
+ pred.probab <- predict(nb_model, new_observation, type = "raw")
+ pred.class_new; pred.probab
+```
+```{r}
+Low<-0.3476612*0.6909091*0.010909091*0.41818182*0.032727273*0.000000000*0.2909091*0.05818182*0.94909091*0.952727273*0.934545455
+Medium <-0.3451327*0.80586080*025641026*0.56410256*0.021978022*0.000000000*0.3663004*0.04029304*0.91208791*0.956043956*0.901098901
+High<- 0.3072061*0.7983539*0.016460905*0.83127572*0.020576132*0.004115226*0.6666667*0.11111111*0.75308642*0.946502058*0.839506173
+
+ sum_of_all <- Low+Medium+High
+ Low/sum_of_all
+ Medium/sum_of_all
+ High/sum_of_all
+```
+
+#there are some differences in my manual calculations compare to the actual predictions it might have rounded up 

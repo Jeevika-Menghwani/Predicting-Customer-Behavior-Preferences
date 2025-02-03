@@ -1,0 +1,290 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+install.packages("rmarkdown", dep = TRUE)
+
+install.packages("tinytex")
+tinytex::install_tinytex()  # install TinyTeX
+chooseCRANmirror(graphics=FALSE)
+R.version.string
+options(repos = c(CRAN = "https://cran.rstudio.com"))
+```{r}
+install.packages("tidyverse")
+library(tidyverse)
+library(dplyr)
+install.packages("naniar")
+library(naniar)
+install.packages("caret")
+library(caret)
+library("ggplot2")
+library("lattice")
+install.packages("FNN")
+library("FNN")
+install.packages("class")
+library(class)
+
+```
+
+```{r}
+spotify <- "/Users/Jeevikamenghwani/Downloads/spotify.csv"
+spotify_2023 <- "/Users/Jeevikamenghwani/Downloads/spotify-2023.csv"
+spotify_file<- read.csv(spotify)
+spotify_2023_file<- read.csv(spotify_2023)
+```
+
+#danceability: 75
+#energy: 68
+#speechiness: 6
+#acousticness: 9
+#liveness: 13
+#valence: 57
+#BPM:96
+
+```{r}
+your_song_info <- spotify_2023_file[spotify_2023_file$track_name == "Blank Space", ]
+
+```
+#I picked blank space, it reminded me of school
+```{r}
+str(spotify_file)
+```
+
+#Traget is Integer variable 
+```{r}
+spotify_file$target <- as.factor(spotify_file$target)
+str(spotify_file)
+```
+
+
+
+```{r}
+unique_values <- unique(spotify_file$target)
+for (value in unique_values) {
+    count <- sum(spotify_file$target == value)
+    cat("Value:", value, "| Count:", count, "\n")
+}
+```
+
+```{r}
+any_na <- any(is.na(spotify_file))
+print(paste("are there any NA?",any_na))
+```
+
+
+
+```{r}
+columns_to_convert <- c("danceability_.", "energy_.", "speechiness_.", "valence_.","acousticness_.", "liveness_.")
+
+# Loop through each column and convert values to decimals
+for (col in columns_to_convert) {
+    spotify_2023_file[[col]] <- spotify_2023_file[[col]] / 100
+}
+
+```
+
+```{r}
+original_names <- c("danceability_.", "energy_.", "speechiness_.", "valence_.", "acousticness_.", "liveness_.")
+
+new_names <- c("danceability", "energy", "speechiness", "valence", "acousticness", "liveness")
+
+for (i in 1:length(original_names)) {
+  names(spotify_2023_file)[names(spotify_2023_file) == original_names[i]] <- new_names[i]
+  names(spotify_file)[names(spotify_file) == original_names[i]] <- new_names[i]
+}
+
+
+```
+
+```{r}
+colnames(your_song_info)[colnames(your_song_info) == "bpm"] <- "tempo"
+```
+
+```{r}
+set.seed(880)
+train.index <- sample(c(1:nrow(spotify_file)), nrow(spotify_file)*0.6)
+train.df <- spotify_file[train.index, ]
+valid.df <- spotify_file[-train.index, ]
+```
+
+```{r}
+# Create a vector of variable names
+variables <- c("danceability", "tempo", "energy", "speechiness", "valence", "acousticness", "liveness")
+
+
+t_test_results <- list()
+
+
+for (i in 1:(length(variables)-1)) {
+  for (j in (i+1):length(variables)) {
+    # Perform two-sample t-test
+    t_test_result <- t.test(train.df[train.df$target == 1, variables[i]],
+                            train.df[train.df$target == 0, variables[j]])
+    
+    # Store results in the list
+    variable_pair <- paste(variables[i], "-", variables[j], sep = "_vs_")
+    t_test_results[[variable_pair]] <- t_test_result
+  }
+}
+
+# Print the results
+for (pair in names(t_test_results)) {
+  cat("Variable Pair:", pair, "\n")
+  cat("T-value:", t_test_results[[pair]]$statistic, "\n")
+  cat("P-value:", t_test_results[[pair]]$p.value, "\n\n")
+}
+
+```
+
+
+```{r}
+# Significance level
+alpha <- 0.05
+
+# List to store significant variable pairs
+significant_pairs <- character()
+
+# Loop through each pair of variables
+for (pair in names(t_test_results)) {
+  # Check if p-value is less than alpha
+  if (t_test_results[[pair]]$p.value < alpha) {
+    significant_pairs <- c(significant_pairs, pair)
+  } else {
+    # Remove variables from data
+    variable_names <- unlist(strsplit(pair, "_vs_"))
+    train.df[, variable_names] <- NULL
+  }
+}
+
+# Print significant variable pairs
+if (length(significant_pairs) > 0) {
+  cat("Variables with significant difference:\n")
+  for (pair in significant_pairs) {
+    cat(pair, "\n")
+  }
+} else {
+  cat("No variables show a significant difference.\n")
+}
+
+```
+# The variables that do not show a significant difference between the 'like' and 'dislike' values, based on the provided statistical tests results, are as follows:
+
+#energy_vs_-_vs_speechiness
+#acousticness_vs_-_vs_liveness
+#It  make sense to remove variables from a k-nearest neighbors (k-NN) model when those variables' values are very similar for both outcome classes because such variables contribute minimally to distinguishing between classes, potentially leading to noise in the model and reducing its predictive power. Removing these variables helps simplify the model and focus on the most informative features for classification
+
+```{r}
+# Assuming your dataset is called 'spotify_data'
+
+# Remove the variables
+spotify_file <- spotify_file[, !(names(spotify_file) %in% c("energy", "liveness", "speechiness", "acousticness"))]
+
+# Check the updated dataset
+head(spotify_file)
+
+```
+
+```{r}
+
+# Initialize normalized training, validation, and complete data frames to originals
+train.norm.df<- train.df
+valid.norm.df <- valid.df
+spotify_file.norm.df <- spotify_file
+
+
+
+# Use preProcess() from the caret package to normalize specified variables
+library(caret)
+norm.values <- preProcess(train.df [, c("danceability", "tempo", "valence")],  method = c("center", "scale"))
+
+# Apply normalization to training, validation, and mower data frames
+train.norm.df[, c("danceability", "tempo",  "valence")] <- predict(norm.values, train.df[, c("danceability", "tempo",  "valence")])
+
+valid.norm.df[, c("danceability", "tempo",  "valence")] <- predict(norm.values, valid.df[, c("danceability", "tempo",  "valence")])
+spotify_file.norm.df[, c("danceability", "tempo",  "valence")] <- predict(norm.values, spotify_file[, c("danceability", "tempo",  "valence")])
+
+train.norm.df <- predict(norm.values, train.df[, c("danceability", "tempo", "valence")])
+valid.norm.df <- predict(norm.values, valid.df[, c("danceability", "tempo", "valence")])
+spotify_file.norm.df <- predict(norm.values, spotify_file[, c("danceability", "tempo", "valence")])
+
+
+song_data <- data.frame(
+  danceability = 455.8941,
+  tempo = -1.000828,
+  valence = 228.4043
+)
+  
+nn <- knn(train = train.norm.df[, c("danceability", "tempo", "valence")], 
+          test = song_data[, c("danceability", "tempo", "valence")],
+          cl = train.df[, 8], 
+          k = 7)
+
+nn
+
+# Extract the index values of the 7 nearest neighbors
+
+```
+
+```{r}
+# Initialize a vector to store accuracy values
+# Initialize a data frame to store k-values and their corresponding accuracy
+accuracy_df <- data.frame(k = seq(1, 20), accuracy = rep(0, 20))
+
+# Iterate over different k-values
+for (k in 1:20) {
+    # Apply k-nn algorithm
+    knn_pred <- knn(train = train.norm.df[, c("danceability", "tempo", "valence")],
+                    test = valid.norm.df[, c("danceability", "tempo", "valence")],
+                    cl = train.df[, 8],
+                    k = k)
+    
+    # Compute accuracy
+    accuracy <- sum(knn_pred == valid.df[, 8]) / length(valid.df[, 8])
+    
+    # Store accuracy in the data frame
+    accuracy_df[k, "accuracy"] <- accuracy
+}
+
+# Display the accuracy dataframe
+print(accuracy_df)
+
+```
+
+```{r}
+# Plot the scatterplot
+plot(accuracy_df$k, accuracy_df$accuracy, 
+     type = "b", 
+     xlab = "k-value", 
+     ylab = "Accuracy",
+     main = "Accuracy vs. k-value")
+
+# Add grid lines
+grid()
+
+# Add a legend
+legend("topright", legend = "Accuracy", col = "blue", lty = 1, cex = 0.8, bty = "n")
+
+```
+#One limitation of using numeric attributes to predict song likability is the potential oversimplification of human preferences. While numeric attributes capture certain features of a song (e.g., tempo, energy), they may not fully capture subjective aspects like emotional resonance or personal taste. Additionally, relying solely on numeric attributes ignores contextual factors such as mood, cultural background, and past experiences, which play significant roles in determining song preferences. Therefore, while numeric attributes provide valuable insights, they should be complemented with qualitative analysis and consideration of broader contextual factors for more accurate predictions of song likability.
+```{r}
+# Re-run knn with the optimal k-value
+optimal_k <- 7  # Change this to the optimal k-value you found
+nn_optimal <- knn(train = train.norm.df[, c("danceability", "tempo", "valence")], 
+                  test = song_data[, c("danceability", "tempo", "valence")],
+                  cl = train.df[, 8], 
+                  k = optimal_k)
+
+# Show the result
+print(nn_optimal)
+
+# Extract the index values of the k-nearest neighbors
+nearest_neighbors_index_optimal <- nn_optimal$nn.index
+
+# Get the information of the k-nearest neighbors from your dataset
+nearest_neighbors_info_optimal <- train.norm.df[nearest_neighbors_index_optimal, ]
+
+# Display the information of the k-nearest neighbors
+print(nearest_neighbors_info_optimal)
+
+```
